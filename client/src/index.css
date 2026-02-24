@@ -1,0 +1,217 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Color palette inspired by Nestaway: ocean/teal blues */
+  --primary: #0077be; /* main */
+  --primary-dark: #005f94; /* darker for border/hover */
+  --accent: #00a3d9; /* gradient accent */
+  --muted: #eef2f6; /* secondary button bg */
+  --muted-dark: #e0e6eb; /* secondary hover */
+}
+
+* {
+  @apply scroll-smooth;
+}
+
+body {
+  @apply bg-gray-50 text-gray-900;
+  /* Use Google Fonts */
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+}
+
+.btn-primary {
+  /* Oval primary button with darker border */
+  @apply px-5 py-2 text-white rounded-full transition-colors font-medium inline-flex items-center justify-center;
+  background-color: var(--primary);
+  border: 2px solid var(--primary-dark);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+}
+
+.btn-primary:hover {
+  background-color: var(--primary-dark);
+}
+
+.btn-secondary {
+  @apply px-5 py-2 text-gray-800 rounded-full transition-colors font-medium inline-flex items-center justify-center;
+  background-color: var(--muted);
+  border: 2px solid var(--muted-dark);
+}
+
+.btn-secondary:hover {
+  background-color: var(--muted-dark);
+}
+
+.btn-danger {
+  @apply px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium;
+}
+
+.card {
+  @apply bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow;
+}
+
+/* Header / Navbar custom styles */
+.site-header {
+  /* revert to original light header (white) with subtle border */
+  background: white;
+  color: var(--primary);
+  border-bottom: 1px solid #e6eaf0;
+}
+
+.site-logo {
+  font-family: 'Poppins', 'Inter', sans-serif;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.logo-bounce {
+  display: inline-block;
+  transform-origin: center;
+  animation: bounce 2.5s infinite;
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+/* subtle card hover lift */
+.card:hover { transform: translateY(-4px); }
+
+/* animated shimmer for images */
+.shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.shimmer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -150%;
+  width: 150%;
+  height: 100%;
+  background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0) 100%);
+  animation: shimmer 2s infinite;
+}
+@keyframes shimmer {
+  0% { left: -150%; }
+  100% { left: 150%; }
+}
+
+.input-field {
+  @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500;
+}
+
+.label {
+  @apply block text-sm font-medium text-gray-700 mb-2;
+}
+
+.alert-success {
+  @apply bg-green-100 text-green-800 p-4 rounded-lg mb-4;
+}
+
+.alert-error {
+  @apply bg-red-100 text-red-800 p-4 rounded-lg mb-4;
+}
+
+/* PG Card Styling */
+.pg-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 20px;
+  padding: 20px 0;
+}
+
+.pg-card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+}
+
+.pg-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+.image-gallery {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  padding: 10px;
+  background: #f3f4f6;
+}
+
+.image-gallery img {
+  width: 100%;
+  height: 130px;
+  object-fit: cover;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.image-gallery img:hover {
+  transform: scale(1.05);
+}
+
+.pg-card-content {
+  padding: 16px;
+}
+
+.pg-card-content h3 {
+  color: var(--primary);
+  font-size: 18px;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.pg-address {
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 12px;
+}
+
+.pg-price {
+  color: var(--accent);
+  font-weight: bold;
+  font-size: 18px;
+  margin: 10px 0;
+}
+
+.pg-details {
+  font-size: 13px;
+  color: #555;
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.pg-amenities-preview {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pg-amenities-preview span {
+  background: #f0f7ff;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border-left: 2px solid var(--primary);
+}
+
+@media (max-width: 600px) {
+  .image-gallery {
+    grid-template-columns: 1fr;
+  }
+  
+  .pg-grid {
+    grid-template-columns: 1fr;
+  }
+}
