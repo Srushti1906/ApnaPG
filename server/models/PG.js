@@ -52,7 +52,7 @@ const pgSchema = new mongoose.Schema(
       },
       coordinates: {
         type: [Number], // [longitude, latitude]
-        required: true,
+        default: [0, 0], // Default to [0, 0] until geocoded
       },
     },
 

@@ -1,11 +1,17 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
-import { useAuth } from '../hooks';
+import { useAuthContext } from '../context/AuthContext';
+import { LoadingSpinner } from '../components/Common';
 
 export default function ProtectedRoute({ children, requiredRole }) {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, loading } = useAuthContext();
 
-  if (!isAuthenticated) {
+  // Wait for auth check to complete
+  if (loading) {
+    return <LoadingSpinner />;
+  }
+
+  if (!isAuthenticated()) {
     return <Navigate to="/login" />;
   }
 

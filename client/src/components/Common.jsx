@@ -74,6 +74,16 @@ export function PGCard({ pg, onClick }) {
         >
           Book
         </button>
+        {(pg.ownerPhone || pg.owner?.phone) && (
+          <a
+            href={`tel:${pg.ownerPhone || pg.owner?.phone}`}
+            onClick={(e) => e.stopPropagation()}
+            className="block mt-2 bg-green-100 hover:bg-green-200 text-green-800 font-semibold py-2 px-3 rounded text-center text-sm"
+            title="Call owner directly"
+          >
+            📞 Call Owner: {pg.ownerPhone || pg.owner?.phone}
+          </a>
+        )}
       </div>
     </div>
   );

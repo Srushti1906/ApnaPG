@@ -4,6 +4,7 @@ const {
   getBookingById,
   getUserBookings,
   getOwnerBookings,
+  getOwnerCustomers,
   approveBooking,
   rejectBooking,
   cancelBooking,
@@ -15,8 +16,15 @@ const router = express.Router();
 
 // Private routes
 router.post('/', protect, validateBooking, checkGenderCompatibility, createBooking);
-router.get('/user/bookings', protect, authorize('User'), getUserBookings);
+
+// Owner routes (before :id to avoid conflicts)
+router.get('/owner/customers', protect, authorize('Owner'), getOwnerCustomers);
 router.get('/owner/bookings', protect, authorize('Owner'), getOwnerBookings);
+
+// User routes
+router.get('/user/bookings', protect, authorize('User'), getUserBookings);
+
+// Get booking by ID
 router.get('/:id', protect, getBookingById);
 
 // Owner approval routes

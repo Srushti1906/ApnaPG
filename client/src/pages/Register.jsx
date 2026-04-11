@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { authService } from '../services';
+import { useAuthContext } from '../context/AuthContext';
 import { RegisterForm } from '../components/AuthForms';
 import { Alert } from '../components/Common';
 
 export default function Register() {
   const navigate = useNavigate();
+  const { register: registerUser } = useAuthContext();
   const [alert, setAlert] = useState(null);
 
   const handleRegister = async (values) => {
@@ -15,7 +16,7 @@ export default function Register() {
     }
 
     try {
-      const response = await authService.register({
+      const result = await registerUser({
         fullName: values.fullName,
         email: values.email,
         password: values.password,
@@ -25,9 +26,26 @@ export default function Register() {
         role: values.role,
       });
 
-      localStorage.setItem('token', response.data.token);
-      setAlert({ type: 'success', message: 'Registration successful!' });
-      setTimeout(() => navigate('/'), 2000);
+      if (result.success) {
+        setAlert({ type: 'success', message: 'Registration successful!' });
+        
+        // Redirect based on user role
+        const userRole = result.user?.role;
+        setTimeout(() => {
+          if (userRole === 'Owner') {
+            navigate('/owner-dashboard');
+          } else if (userRole === 'User') {
+            navigate('/my-bookings');
+          } else {
+            navigate('/');
+          }
+        }, 800);
+      } else {
+        setAlert({
+          type: 'error',
+          message: result.error || 'Registration failed',
+        });
+      }
     } catch (error) {
       setAlert({
         type: 'error',

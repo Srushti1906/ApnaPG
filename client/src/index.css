@@ -47,6 +47,20 @@ body {
   @apply px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium;
 }
 
+.quick-filter-btn {
+  @apply px-4 py-2 rounded-full border-2 transition-all duration-200 font-medium text-sm;
+  background-color: white;
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.quick-filter-btn:hover {
+  background-color: var(--primary);
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 119, 190, 0.3);
+}
+
 .card {
   @apply bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow;
 }

@@ -2,12 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { pgService, bookingService, reviewService, enquiryService } from '../services';
 import { Alert, LoadingSpinner, EmptyState } from '../components/Common';
-import { useAuth } from '../hooks';
+import { useAuthContext } from '../context/AuthContext';
 
 export default function PGDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated } = useAuthContext();
   const [pg, setPG] = useState(null);
   const [rooms, setRooms] = useState([]);
   const [reviews, setReviews] = useState([]);
@@ -81,33 +81,76 @@ export default function PGDetails() {
     }
 
     try {
-      // Always create an enquiry (works for both authenticated and unauthenticated)
-      let days = null;
-      if (bookingDates.checkInDate && bookingDates.checkOutDate) {
-        const ci = new Date(bookingDates.checkInDate);
-        const co = new Date(bookingDates.checkOutDate);
-        days = Math.max(1, Math.round((co - ci) / (1000 * 60 * 60 * 24)));
-      } else if (durationType === 'oneDay') days = 1;
-      else if (durationType === 'oneMonth') days = 30;
+      // For authenticated users, create a real booking
+      if (isAuthenticated()) {
+        let checkInDate = bookingDates.checkInDate;
+        let checkOutDate = bookingDates.checkOutDate;
+        let bookingType = 'Daily';
 
-      const enquiry = {
-        pgId: pg._id,
-        roomId: selectedRoom._id,
-        name: user?.fullName || 'Guest User',
-        phone: user?.phone || '9999999999',
-        collegeName: user?.collegeName || '',
-        age: user?.age || null,
-        occupation: user?.occupation || 'Guest',
-        durationType,
-        days,
-      };
+        // Set dates based on duration type
+        if (durationType === 'oneDay') {
+          const today = new Date().toISOString().slice(0, 10);
+          checkInDate = today;
+          checkOutDate = today;
+          bookingType = 'Daily';
+        } else if (durationType === 'oneMonth') {
+          if (!bookingDates.checkInDate) {
+            const today = new Date().toISOString().slice(0, 10);
+            checkInDate = today;
+            const co = new Date(today);
+            co.setDate(co.getDate() + 30);
+            checkOutDate = co.toISOString().slice(0, 10);
+          }
+          bookingType = 'Monthly';
+        }
 
-      await enquiryService.createEnquiry(enquiry);
-      setBookingResult({ type: 'success', message: 'Your booking request has been sent. Owner will contact you soon!' });
-      setAlert({ type: 'success', message: 'Your booking request has been sent. Owner will contact you soon!' });
-      setTimeout(() => {
-        resultRef.current?.scrollIntoView({ behavior: 'smooth' });
-      }, 100);
+        const bookingData = {
+          roomId: selectedRoom._id,
+          checkInDate,
+          checkOutDate,
+          bookingType,
+          specialRequests: '',
+        };
+
+        await bookingService.createBooking(bookingData);
+        setBookingResult({ type: 'success', message: 'Your booking has been confirmed! Check your bookings for details.' });
+        setAlert({ type: 'success', message: 'Your booking has been confirmed!' });
+        setTimeout(() => {
+          resultRef.current?.scrollIntoView({ behavior: 'smooth' });
+          // Reset form
+          setSelectedRoom(null);
+          setBookingDates({ checkInDate: '', checkOutDate: '' });
+          setDurationType('custom');
+        }, 2000);
+      } else {
+        // For unauthenticated users, create an enquiry
+        let days = null;
+        if (bookingDates.checkInDate && bookingDates.checkOutDate) {
+          const ci = new Date(bookingDates.checkInDate);
+          const co = new Date(bookingDates.checkOutDate);
+          days = Math.max(1, Math.round((co - ci) / (1000 * 60 * 60 * 24)));
+        } else if (durationType === 'oneDay') days = 1;
+        else if (durationType === 'oneMonth') days = 30;
+
+        const enquiry = {
+          pgId: pg._id,
+          roomId: selectedRoom._id,
+          name: 'Guest User',
+          phone: '9999999999',
+          collegeName: '',
+          age: null,
+          occupation: 'Guest',
+          durationType,
+          days,
+        };
+
+        await enquiryService.createEnquiry(enquiry);
+        setBookingResult({ type: 'success', message: 'Your booking request has been sent. Owner will contact you soon!' });
+        setAlert({ type: 'success', message: 'Your booking request has been sent. Please log in for confirmed bookings.' });
+        setTimeout(() => {
+          resultRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
+      }
     } catch (error) {
       console.error('Booking error:', error);
       const errorMsg = error.response?.data?.message || error.message || 'Request failed';
@@ -266,9 +309,60 @@ export default function PGDetails() {
           <div>
             <span className="text-gray-600 text-sm">Owner</span>
             <p className="font-bold">{pg.owner?.fullName || pg.ownerName || 'Owner'}</p>
-            { (pg.ownerPhone || pg.owner?.phone) && (
-              <p className="text-sm text-gray-600">Contact: {pg.ownerPhone || pg.owner?.phone}</p>
-            ) }
+          </div>
+        </div>
+
+        {/* Owner Contact Card */}
+        <div className="mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg border-2 border-blue-200">
+          <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+            📞 Contact Owner
+          </h3>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <p className="text-gray-600 text-sm mb-1">Owner Name</p>
+              <p className="text-xl font-bold text-gray-800">{pg.owner?.fullName || pg.ownerName || 'PG Owner'}</p>
+            </div>
+            <div>
+              <p className="text-gray-600 text-sm mb-1">Phone</p>
+              <div className="flex gap-2 items-center">
+                <p className="text-xl font-bold text-gray-800">{pg.owner?.phone || pg.ownerPhone || 'N/A'}</p>
+                {(pg.owner?.phone || pg.ownerPhone) && (
+                  <>
+                    <a
+                      href={`tel:${pg.owner?.phone || pg.ownerPhone}`}
+                      className="btn-primary px-3 py-2 text-sm inline-flex items-center gap-1"
+                      title="Call owner"
+                    >
+                      📞 Call
+                    </a>
+                    <button
+                      onClick={() => {
+                        const phoneNum = pg.owner?.phone || pg.ownerPhone;
+                        navigator.clipboard.writeText(phoneNum);
+                        setAlert({ type: 'success', message: 'Phone number copied!' });
+                      }}
+                      className="bg-gray-200 hover:bg-gray-300 px-3 py-2 text-sm rounded-lg font-medium inline-flex items-center gap-1"
+                      title="Copy phone number"
+                    >
+                      📋 Copy
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+            <div>
+              <p className="text-gray-600 text-sm mb-1">Email</p>
+              <p className="text-gray-800">{pg.owner?.email || pg.ownerEmail || 'N/A'}</p>
+            </div>
+            <div>
+              <p className="text-gray-600 text-sm mb-1">Availability</p>
+              <p className="text-gray-800 font-semibold">Available for inquiries</p>
+            </div>
+          </div>
+          <div className="mt-4 p-3 bg-white rounded border border-blue-200">
+            <p className="text-sm text-gray-700">
+              💡 <strong>Tip:</strong> You can directly call the owner to discuss pricing, availability, or any special requests before booking.
+            </p>
           </div>
         </div>
 
@@ -469,78 +563,104 @@ export default function PGDetails() {
       </div>
 
       {/* Booking Section */}
-      {selectedRoom && (
-        <div className="card mb-8 bg-blue-50 border-2 border-blue-400">
-          <h2 className="text-2xl font-bold mb-4">Book This Room</h2>
-          <div className="grid md:grid-cols-3 gap-4 mb-4">
+      <div className="card mb-8 bg-gradient-to-r from-blue-500 to-indigo-600 text-white border-0">
+        <h2 className="text-2xl font-bold mb-6">🏠 Book This PG</h2>
+        
+        {!selectedRoom ? (
+          <div className="text-center py-8">
+            <p className="text-lg mb-4">Select a room to proceed with booking</p>
+            <p className="text-blue-100">Choose a room from the "Available Rooms" section above</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="bg-white bg-opacity-20 p-4 rounded-lg border border-white border-opacity-30">
+              <p className="text-blue-100 mb-1">Selected Room</p>
+              <p className="text-xl font-bold">{selectedRoom.roomType} - ₹{selectedRoom.dailyPrice}/night</p>
+            </div>
+
+            <div className="grid md:grid-cols-4 gap-4">
               <div>
-                <label className="label">Duration</label>
-                <select className="input-field" value={durationType} onChange={(e) => setDurationType(e.target.value)}>
+                <label className="label text-blue-100">Duration</label>
+                <select 
+                  className="input-field bg-white text-gray-800" 
+                  value={durationType} 
+                  onChange={(e) => setDurationType(e.target.value)}
+                >
                   <option value="oneDay">1 Day</option>
-                  <option value="custom">Custom (choose dates)</option>
-                  <option value="oneMonth">1 Month (30 days)</option>
+                  <option value="custom">Custom Dates</option>
+                  <option value="oneMonth">1 Month</option>
                 </select>
               </div>
-              <div className="flex items-center">
-                <div>
-                  <div className="text-sm text-gray-600">Estimated Price</div>
-                  <div className="text-lg font-bold text-blue-600">{estimatedPrice ? `₹${estimatedPrice}` : '—'}</div>
-                </div>
+
+              {durationType === 'custom' && (
+                <>
+                  <div>
+                    <label className="label text-blue-100">Check-in</label>
+                    <input
+                      type="date"
+                      className="input-field bg-white text-gray-800"
+                      value={bookingDates.checkInDate}
+                      min={minDate}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val < minDate) {
+                          setAlert({ type: 'error', message: 'Check-in cannot be in the past' });
+                          return;
+                        }
+                        if (bookingDates.checkOutDate && bookingDates.checkOutDate <= val) {
+                          setBookingDates({ ...bookingDates, checkInDate: val, checkOutDate: '' });
+                        } else {
+                          setBookingDates({ ...bookingDates, checkInDate: val });
+                        }
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label className="label text-blue-100">Check-out</label>
+                    <input
+                      type="date"
+                      className="input-field bg-white text-gray-800"
+                      value={bookingDates.checkOutDate}
+                      min={checkOutMin}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (bookingDates.checkInDate && val <= bookingDates.checkInDate) {
+                          setAlert({ type: 'error', message: 'Check-out must be after check-in' });
+                          return;
+                        }
+                        setBookingDates({ ...bookingDates, checkOutDate: val });
+                      }}
+                    />
+                  </div>
+                </>
+              )}
+
+              <div className="flex flex-col justify-end">
+                <p className="text-blue-100 text-sm">Estimated Cost</p>
+                <p className="text-2xl font-bold">{estimatedPrice ? `₹${estimatedPrice}` : '—'}</p>
               </div>
-            <div>
-              <label className="label">Check-in Date</label>
-              <input
-                type="date"
-                value={bookingDates.checkInDate}
-                min={minDate}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (val < minDate) {
-                    setAlert({ type: 'error', message: 'Check-in cannot be in the past' });
-                    setBookingDates({ ...bookingDates, checkInDate: minDate });
-                    return;
-                  }
-                  // if check-out exists and is earlier or equal, clear it
-                  if (bookingDates.checkOutDate && bookingDates.checkOutDate <= val) {
-                    setBookingDates({ ...bookingDates, checkInDate: val, checkOutDate: '' });
-                  } else {
-                    setBookingDates({ ...bookingDates, checkInDate: val });
-                  }
-                }}
-                className="input-field"
-              />
             </div>
-            <div>
-              <label className="label">Check-out Date</label>
-              <input
-                type="date"
-                value={bookingDates.checkOutDate}
-                min={checkOutMin}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (val < minDate) {
-                    setAlert({ type: 'error', message: 'Check-out cannot be in the past' });
-                    setBookingDates({ ...bookingDates, checkOutDate: checkOutMin });
-                    return;
-                  }
-                  if (bookingDates.checkInDate && val <= bookingDates.checkInDate) {
-                    setAlert({ type: 'error', message: 'Check-out must be after check-in' });
-                    setBookingDates({ ...bookingDates, checkOutDate: '' });
-                    return;
-                  }
-                  setBookingDates({ ...bookingDates, checkOutDate: val });
-                }}
-                className="input-field"
-              />
+
+            <div className="bg-white bg-opacity-10 p-4 rounded-lg">
+              <p className="text-sm text-blue-100 mb-2">📋 How it works:</p>
+              <ul className="text-sm text-blue-100 space-y-1">
+                <li>✓ Select room and dates</li>
+                <li>✓ Click "Send Booking Request"</li>
+                <li>✓ Owner will review and contact you</li>
+                <li>✓ You can track status in "My Bookings"</li>
+              </ul>
             </div>
-            <div className="flex items-end">
-              <button onClick={handleBooking} className="btn-primary w-full">
-                Book Now
-              </button>
-            </div>
+
+            <button 
+              onClick={handleBooking} 
+              disabled={loading}
+              className="btn-primary w-full text-lg font-bold py-3 bg-white text-blue-600 hover:bg-blue-50 disabled:opacity-50"
+            >
+              {loading ? '⏳ Sending Request...' : '📤 Send Booking Request to Owner'}
+            </button>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Booking Result (visible and scrolled-to) */}
       {bookingResult && (

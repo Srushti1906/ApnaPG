@@ -7,10 +7,14 @@ import Register from './pages/Register';
 import Browse from './pages/Browse';
 import PGDetails from './pages/PGDetails';
 import MyBookings from './pages/MyBookings';
+import AddPG from './pages/AddPG';
+import EditPG from './pages/EditPG';
+import AddRoom from './pages/AddRoom';
+import OwnerPGDetails from './pages/OwnerPGDetails';
+import OwnerDashboard from './pages/OwnerDashboard';
 // Admin pages removed
 import ProtectedRoute from './pages/ProtectedRoute';
 import './index.css';
-// ChatWidget removed in favor of Botpress webchat
 import BookingModal from './components/BookingModal';
 
 export default function App() {
@@ -34,6 +38,51 @@ export default function App() {
             element={
               <ProtectedRoute requiredRole="User">
                 <MyBookings />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/add-pg"
+            element={
+              <ProtectedRoute requiredRole="Owner">
+                <AddPG />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/edit-pg/:id"
+            element={
+              <ProtectedRoute requiredRole="Owner">
+                <EditPG />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/add-room/:pgId"
+            element={
+              <ProtectedRoute requiredRole="Owner">
+                <AddRoom />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/owner-pg-details/:id"
+            element={
+              <ProtectedRoute requiredRole="Owner">
+                <OwnerPGDetails />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/owner-dashboard"
+            element={
+              <ProtectedRoute requiredRole="Owner">
+                <OwnerDashboard />
               </ProtectedRoute>
             }
           />

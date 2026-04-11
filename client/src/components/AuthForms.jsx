@@ -4,9 +4,10 @@ import { Alert } from './Common';
 
 export function LoginForm({ onSubmit }) {
   const [alert, setAlert] = useState(null);
-  const { values, handleChange, handleSubmit } = useForm(
+  const [userRole, setUserRole] = useState('User');
+  const { values, handleChange, handleSubmit: handleFormSubmit } = useForm(
     { email: '', password: '' },
-    onSubmit
+    (formValues) => onSubmit(formValues, userRole)
   );
 
   return (
@@ -22,7 +23,36 @@ export function LoginForm({ onSubmit }) {
           />
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Role Selection */}
+        <div className="mb-6">
+          <label className="label">Login As</label>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => setUserRole('User')}
+              className={`p-3 rounded-lg border-2 font-medium transition ${
+                userRole === 'User'
+                  ? 'border-blue-600 bg-blue-50 text-blue-600'
+                  : 'border-gray-300 text-gray-700 hover:border-gray-400'
+              }`}
+            >
+              👤 Tenant/User
+            </button>
+            <button
+              type="button"
+              onClick={() => setUserRole('Owner')}
+              className={`p-3 rounded-lg border-2 font-medium transition ${
+                userRole === 'Owner'
+                  ? 'border-green-600 bg-green-50 text-green-600'
+                  : 'border-gray-300 text-gray-700 hover:border-gray-400'
+              }`}
+            >
+              🏢 Owner/Manager
+            </button>
+          </div>
+        </div>
+
+        <form onSubmit={handleFormSubmit} className="space-y-4">
           <div>
             <label className="label">Email</label>
             <input
@@ -31,6 +61,7 @@ export function LoginForm({ onSubmit }) {
               value={values.email}
               onChange={handleChange}
               className="input-field"
+              placeholder={userRole === 'Owner' ? 'owner@example.com' : 'user@example.com'}
               required
             />
           </div>
@@ -48,7 +79,7 @@ export function LoginForm({ onSubmit }) {
           </div>
 
           <button type="submit" className="btn-primary w-full">
-            Login
+            Login as {userRole}
           </button>
         </form>
 
@@ -58,6 +89,28 @@ export function LoginForm({ onSubmit }) {
             Register here
           </a>
         </p>
+
+        {/* Role Information */}
+        <div className="mt-6 p-3 rounded-lg bg-gray-50 text-xs text-gray-700">
+          <p className="font-semibold mb-2">
+            {userRole === 'Owner' ? '🏢 Owner Account' : '👤 Tenant Account'}
+          </p>
+          {userRole === 'Owner' ? (
+            <ul className="list-disc list-inside space-y-1">
+              <li>Manage your PGs</li>
+              <li>View bookings & customers</li>
+              <li>Track ratings & reviews</li>
+              <li>Update PG details</li>
+            </ul>
+          ) : (
+            <ul className="list-disc list-inside space-y-1">
+              <li>Browse available PGs</li>
+              <li>Book rooms</li>
+              <li>Track your bookings</li>
+              <li>Rate & review PGs</li>
+            </ul>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -87,7 +140,11 @@ export function RegisterForm({ onSubmit }) {
           <label className="label">I am a</label>
           <select
             value={userType}
-            onChange={(e) => setUserType(e.target.value)}
+            onChange={(e) => {
+              const type = e.target.value;
+              setUserType(type);
+              handleChange({ target: { name: 'role', value: type } });
+            }}
             className="input-field"
           >
             <option value="User">User (Looking for PG)</option>

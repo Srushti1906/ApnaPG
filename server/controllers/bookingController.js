@@ -432,3 +432,118 @@ exports.cancelBooking = async (req, res) => {
     });
   }
 };
+
+// @route   GET /api/bookings/owner/customers
+// @desc    Get owner's customers with their booking history
+// @access  Private (Owner only)
+exports.getOwnerCustomers = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, sortBy = 'lastBooking' } = req.query;
+    const skip = (page - 1) * limit;
+
+    // Get all bookings for this owner
+    const allBookings = await Booking.find({ owner: req.user._id })
+      .populate('user', 'fullName email phone gender createdAt')
+      .populate('pg', 'name')
+      .populate('room', 'roomNumber')
+      .sort({ createdAt: -1 });
+
+    // Group bookings by customer (userId)
+    const customerMap = new Map();
+
+    allBookings.forEach(booking => {
+      const userId = booking.user._id.toString();
+      
+      if (!customerMap.has(userId)) {
+        customerMap.set(userId, {
+          _id: booking.user._id,
+          fullName: booking.user.fullName,
+          email: booking.user.email,
+          phone: booking.user.phone,
+          gender: booking.user.gender,
+          memberSince: booking.user.createdAt,
+          totalBookings: 0,
+          totalAmount: 0,
+          lastBooking: null,
+          bookingStatus: {},
+          bookings: [],
+        });
+      }
+
+      const customer = customerMap.get(userId);
+      customer.totalBookings += 1;
+      customer.totalAmount += booking.finalPrice;
+      
+      // Track status count
+      customer.bookingStatus[booking.status] = (customer.bookingStatus[booking.status] || 0) + 1;
+      
+      // Track last booking
+      if (!customer.lastBooking || new Date(booking.checkInDate) > new Date(customer.lastBooking.checkInDate)) {
+        customer.lastBooking = {
+          date: booking.checkInDate,
+          status: booking.status,
+          pg: booking.pg.name,
+        };
+      }
+      
+      customer.bookings.push({
+        _id: booking._id,
+        bookingId: booking.bookingId,
+        pg: booking.pg.name,
+        room: booking.room.roomNumber,
+        checkInDate: booking.checkInDate,
+        checkOutDate: booking.checkOutDate,
+        status: booking.status,
+        bookingType: booking.bookingType,
+        finalPrice: booking.finalPrice,
+        numberOfNights: booking.numberOfNights,
+      });
+    });
+
+    // Convert map to array
+    let customers = Array.from(customerMap.values());
+
+    // Sort by different criteria
+    if (sortBy === 'totalAmount') {
+      customers.sort((a, b) => b.totalAmount - a.totalAmount);
+    } else if (sortBy === 'totalBookings') {
+      customers.sort((a, b) => b.totalBookings - a.totalBookings);
+    } else if (sortBy === 'lastBooking') {
+      customers.sort((a, b) => {
+        const dateA = b.lastBooking ? new Date(b.lastBooking.date) : new Date(0);
+        const dateB = a.lastBooking ? new Date(a.lastBooking.date) : new Date(0);
+        return dateA - dateB;
+      });
+    }
+
+    const total = customers.length;
+    
+    // Paginate
+    const paginatedCustomers = customers.slice(skip, skip + parseInt(limit));
+
+    res.status(200).json({
+      success: true,
+      customers: paginatedCustomers,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(total / limit),
+      },
+      summary: {
+        totalCustomers: customers.length,
+        totalRevenue: customers.reduce((sum, c) => sum + c.totalAmount, 0),
+        totalBookings: allBookings.length,
+        averageSpentPerCustomer: customers.length > 0 
+          ? Math.round(customers.reduce((sum, c) => sum + c.totalAmount, 0) / customers.length)
+          : 0,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching customers',
+      error: error.message,
+    });
+  }
+};
