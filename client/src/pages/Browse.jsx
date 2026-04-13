@@ -62,6 +62,14 @@ export default function Browse() {
     let results = pgs.filter((pg) => {
       let ok = true;
       
+      // Filter: Only show PGs with owner-provided complete information
+      const hasDescription = pg.description && pg.description.trim().length > 0;
+      const hasCompleteAddress = pg.address && pg.address.street && pg.address.city && pg.address.state;
+      
+      if (!hasDescription || !hasCompleteAddress) {
+        return false;
+      }
+      
       // City filter
       if (city) ok = ok && (pg.address?.city || '').toLowerCase().includes(city);
       
@@ -514,16 +522,20 @@ export default function Browse() {
               {/* Image Gallery - dedupe images and show up to 3 */}
               <div className="image-gallery">
                 {(pg.images && pg.images.length > 0) ? (
-                  Array.from(new Set(pg.images)).slice(0, 3).map((img, idx) => (
-                    <img
-                      key={idx}
-                      src={img}
-                      alt={`${pg.name} - ${idx + 1}`}
-                      onError={(e) => { 
-                        e.target.src = 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80'; 
-                      }}
-                    />
-                  ))
+                  Array.from(new Set(pg.images)).slice(0, 3).map((img, idx) => {
+                    // Construct full URL for images stored in /uploads directory
+                    const imageUrl = img.startsWith('http') ? img : `http://localhost:5000${img}`;
+                    return (
+                      <img
+                        key={idx}
+                        src={imageUrl}
+                        alt={`${pg.name} - ${idx + 1}`}
+                        onError={(e) => { 
+                          e.target.src = 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80'; 
+                        }}
+                      />
+                    );
+                  })
                 ) : (
                   <>
                     <img src="https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80" alt="Room 1" />

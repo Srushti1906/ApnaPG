@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const upload = require('../middleware/upload');
 
 const {
   createPG,
@@ -9,6 +10,8 @@ const {
   updatePG,
   deletePG,
   getPGRooms,
+  uploadPGImages,
+  deletePGImage,
 } = require('../controllers/pgController');
 
 const { protect, authorize } = require('../middleware/auth');
@@ -34,6 +37,12 @@ router.get('/', getPGs);
 
 // Get rooms of a PG (before :id to avoid conflict)
 router.get('/:id/rooms', getPGRooms);
+
+// Upload images for PG
+router.post('/:id/upload-images', protect, authorize('Owner'), upload.array('images', 10), uploadPGImages);
+
+// Delete image from PG
+router.delete('/:id/images/:imagePath', protect, authorize('Owner'), deletePGImage);
 
 // Get single PG by ID
 router.get('/:id', getPGById);

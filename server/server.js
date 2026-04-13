@@ -4,8 +4,10 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const path = require('path');
 const connectDB = require('./config/database');
 const { errorHandler } = require('./middleware/auth');
+const { autoCompleteExpiredBookings } = require('./services/bookingCleanupService');
 
 // Load environment variables
 dotenv.config();
@@ -21,6 +23,9 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Serve static files for uploads
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 // Request logging middleware
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
@@ -35,6 +40,19 @@ app.use('/api/bookings', require('./routes/bookingRoutes'));
 app.use('/api/reviews', require('./routes/reviewRoutes'));
 // Admin routes removed
 app.use('/api/enquiries', require('./routes/enquiryRoutes'));
+
+// Initialize automated booking completion task
+// Runs every hour to check and complete bookings whose checkout date has passed
+setInterval(async () => {
+  console.log('[Booking Cleanup] Running scheduled task...');
+  await autoCompleteExpiredBookings();
+}, 60 * 60 * 1000); // Run every 60 minutes
+
+// Also run on server startup (after a short delay to ensure DB is connected)
+setTimeout(async () => {
+  console.log('[Booking Cleanup] Running initial task after server startup...');
+  await autoCompleteExpiredBookings();
+}, 5000); // Wait 5 seconds after server starts
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

@@ -4,6 +4,7 @@ import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
 import Browse from './pages/Browse';
 import PGDetails from './pages/PGDetails';
 import MyBookings from './pages/MyBookings';
@@ -28,6 +29,7 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/browse" element={<Browse />} />
           <Route path="/pg/:id" element={<PGDetails />} />
           {/* Admin routes removed */}

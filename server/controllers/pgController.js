@@ -410,3 +410,113 @@ exports.getPGRooms = async (req, res) => {
     });
   }
 };
+
+// @route   POST /api/pgs/:id/upload-images
+// @desc    Upload images for a PG
+// @access  Private (Owner only)
+exports.uploadPGImages = async (req, res) => {
+  try {
+    const pg = await PG.findById(req.params.id);
+
+    if (!pg) {
+      return res.status(404).json({
+        success: false,
+        message: 'PG not found',
+      });
+    }
+
+    // Check ownership
+    if (pg.owner.toString() !== req.user._id.toString() && req.user.role !== 'Admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to upload images for this PG',
+      });
+    }
+
+    // Check if files were uploaded
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No files uploaded',
+      });
+    }
+
+    // Get existing images or initialize empty array
+    const existingImages = pg.images || [];
+    const newImages = req.files.map(file => `/uploads/${file.filename}`);
+    
+    // Combine existing and new images
+    const allImages = [...existingImages, ...newImages];
+
+    // Update PG with images
+    pg.images = allImages;
+    if (!pg.thumbnail && allImages.length > 0) {
+      pg.thumbnail = allImages[0];
+    }
+
+    await pg.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Images uploaded successfully',
+      images: allImages,
+      pg,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error uploading images',
+      error: error.message,
+    });
+  }
+};
+
+// @route   DELETE /api/pgs/:id/images/:imagePath
+// @desc    Delete an image from a PG
+// @access  Private (Owner only)
+exports.deletePGImage = async (req, res) => {
+  try {
+    const pg = await PG.findById(req.params.id);
+
+    if (!pg) {
+      return res.status(404).json({
+        success: false,
+        message: 'PG not found',
+      });
+    }
+
+    // Check ownership
+    if (pg.owner.toString() !== req.user._id.toString() && req.user.role !== 'Admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to delete images from this PG',
+      });
+    }
+
+    const imagePath = req.params.imagePath;
+    const decodedImagePath = decodeURIComponent(imagePath);
+
+    // Remove image from array
+    pg.images = pg.images.filter(img => img !== decodedImagePath && img !== `/${imagePath}`);
+
+    // If deleted image was thumbnail, set new one
+    if (pg.thumbnail === decodedImagePath || pg.thumbnail === `/${imagePath}`) {
+      pg.thumbnail = pg.images.length > 0 ? pg.images[0] : null;
+    }
+
+    await pg.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Image deleted successfully',
+      images: pg.images,
+      pg,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting image',
+      error: error.message,
+    });
+  }
+};

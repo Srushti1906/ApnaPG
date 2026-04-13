@@ -222,3 +222,135 @@ exports.logout = async (req, res) => {
     message: 'Logout successful. Please delete the token from client side.',
   });
 };
+
+// @route   POST /api/auth/forgot-password
+// @desc    Request password reset via phone number verification
+// @access  Public
+exports.forgotPassword = async (req, res) => {
+  try {
+    const { phone } = req.body;
+
+    if (!phone) {
+      return res.status(400).json({
+        success: false,
+        message: 'Phone number is required',
+      });
+    }
+
+    if (!validatePhone(phone)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Phone must be 10 digits',
+      });
+    }
+
+    // Find user by phone
+    const user = await User.findOne({ phone });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'No account found with this phone number',
+      });
+    }
+
+    // Generate 6-digit reset code
+    const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const resetExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes validity
+
+    // Save reset code to user
+    user.passwordResetCode = resetCode;
+    user.passwordResetExpiry = resetExpiry;
+    await user.save();
+
+    // In production, send SMS via Twilio or similar service
+    // For now, log it for testing
+    console.log(`Password reset code for ${phone}: ${resetCode}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Password reset code sent to your phone',
+      // In production, don't return the code. For testing:
+      resetCode: resetCode,
+      expiresIn: '15 minutes',
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error processing forgot password',
+      error: error.message,
+    });
+  }
+};
+
+// @route   POST /api/auth/reset-password
+// @desc    Reset password with verification code
+// @access  Public
+exports.resetPassword = async (req, res) => {
+  try {
+    const { phone, resetCode, newPassword, confirmPassword } = req.body;
+
+    if (!phone || !resetCode || !newPassword || !confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'All fields are required',
+      });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Passwords do not match',
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters',
+      });
+    }
+
+    // Find user and check reset code
+    const user = await User.findOne({ phone }).select('+passwordResetCode +passwordResetExpiry');
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'No account found with this phone number',
+      });
+    }
+
+    // Verify reset code
+    if (user.passwordResetCode !== resetCode) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid reset code',
+      });
+    }
+
+    // Check if code has expired
+    if (!user.passwordResetExpiry || new Date() > user.passwordResetExpiry) {
+      return res.status(400).json({
+        success: false,
+        message: 'Reset code has expired. Please request a new one',
+      });
+    }
+
+    // Update password
+    user.password = newPassword;
+    user.passwordResetCode = null;
+    user.passwordResetExpiry = null;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Password reset successfully. Please login with your new password',
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error resetting password',
+      error: error.message,
+    });
+  }
+};

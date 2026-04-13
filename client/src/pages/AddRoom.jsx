@@ -9,6 +9,8 @@ export default function AddRoom() {
   const [loading, setLoading] = useState(false);
   const [pg, setPG] = useState(null);
   const [alert, setAlert] = useState(null);
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [imagePreviews, setImagePreviews] = useState([]);
   const [formData, setFormData] = useState({
     roomNumber: '',
     roomType: 'Single',
@@ -40,6 +42,25 @@ export default function AddRoom() {
     }));
   };
 
+  const handleImageSelect = (e) => {
+    const files = Array.from(e.target.files);
+    setSelectedFiles(files);
+
+    // Generate previews
+    const previews = files.map(file => ({
+      file,
+      preview: URL.createObjectURL(file)
+    }));
+    setImagePreviews(previews);
+  };
+
+  const removeImage = (index) => {
+    const newFiles = selectedFiles.filter((_, i) => i !== index);
+    const newPreviews = imagePreviews.filter((_, i) => i !== index);
+    setSelectedFiles(newFiles);
+    setImagePreviews(newPreviews);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.roomNumber || !formData.dailyPrice) {
@@ -50,12 +71,12 @@ export default function AddRoom() {
     try {
       setLoading(true);
       const roomData = {
-        pg: pgId, // Required: PG reference
+        pg: pgId,
         roomNumber: formData.roomNumber,
         roomType: formData.roomType,
-        bedCount: formData.capacity, // Required
-        availableBeds: formData.capacity, // Required
-        monthlyPrice: parseInt(formData.dailyPrice) * 30, // Calculate monthly price
+        bedCount: formData.capacity,
+        availableBeds: formData.capacity,
+        monthlyPrice: parseInt(formData.dailyPrice) * 30,
         dailyPrice: parseInt(formData.dailyPrice),
         allowOneDayStay: formData.allowOneDayStay,
         availability: {
@@ -65,8 +86,30 @@ export default function AddRoom() {
       };
       
       console.log('Sending room data:', roomData);
-      await roomService.createRoom(roomData);
-      setAlert({ type: 'success', message: 'Room added successfully!' });
+      const roomRes = await roomService.createRoom(roomData);
+      const roomId = roomRes.data.room._id;
+
+      // Upload images if any selected
+      if (selectedFiles.length > 0) {
+        const formDataWithImages = new FormData();
+        selectedFiles.forEach(file => {
+          formDataWithImages.append('images', file);
+        });
+
+        try {
+          await roomService.uploadImages(roomId, formDataWithImages);
+          setAlert({ type: 'success', message: 'Room created with images successfully!' });
+        } catch (imageError) {
+          console.error('Image upload error:', imageError);
+          setAlert({ 
+            type: 'success', 
+            message: 'Room created! (images upload failed - you can add them later)'
+          });
+        }
+      } else {
+        setAlert({ type: 'success', message: 'Room added successfully!' });
+      }
+
       setTimeout(() => navigate(`/owner-pg-details/${pgId}`), 1500);
     } catch (error) {
       console.error('Error creating room:', error);
@@ -177,6 +220,57 @@ export default function AddRoom() {
             </label>
           </div>
 
+          {/* Image Upload Section */}
+          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 bg-gray-50">
+            <h3 className="font-semibold text-gray-900 mb-4">📸 Room Images (Optional)</h3>
+            <p className="text-sm text-gray-600 mb-4">Upload up to 10 images to showcase your room</p>
+            
+            <div className="mb-4">
+              <label className="block">
+                <div className="px-4 py-3 bg-white border-2 border-dashed border-blue-400 rounded-lg cursor-pointer hover:bg-blue-50 transition text-center">
+                  <p className="text-blue-600 font-semibold">📁 Click to select images</p>
+                  <p className="text-xs text-gray-500 mt-1">or drag and drop (max 5MB each)</p>
+                </div>
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  onChange={handleImageSelect}
+                  className="hidden"
+                  disabled={loading}
+                />
+              </label>
+            </div>
+
+            {/* Image Previews */}
+            {imagePreviews.length > 0 && (
+              <div className="mt-4">
+                <p className="text-sm font-semibold text-gray-700 mb-3">
+                  📷 Selected Images ({imagePreviews.length}/10)
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                  {imagePreviews.map((item, index) => (
+                    <div key={index} className="relative group">
+                      <img
+                        src={item.preview}
+                        alt={`Preview ${index + 1}`}
+                        className="w-full h-32 object-cover rounded-lg border-2 border-gray-200"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeImage(index)}
+                        className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition"
+                      >
+                        ✕
+                      </button>
+                      <p className="text-xs text-gray-600 mt-1 truncate">{item.file.name}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Summary */}
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
             <h3 className="font-semibold text-gray-900 mb-2">📋 Summary</h3>
@@ -186,6 +280,7 @@ export default function AddRoom() {
               <li>Bed Count: <span className="font-semibold">{formData.capacity} beds</span></li>
               <li>Daily Price: <span className="font-semibold">₹{formData.dailyPrice || 0}</span></li>
               <li>Monthly Price: <span className="font-semibold">₹{(parseInt(formData.dailyPrice) * 30) || 0}</span></li>
+              <li>Images: <span className="font-semibold">{imagePreviews.length} selected</span></li>
             </ul>
           </div>
 

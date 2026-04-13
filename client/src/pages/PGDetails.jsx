@@ -89,17 +89,20 @@ export default function PGDetails() {
 
         // Set dates based on duration type
         if (durationType === 'oneDay') {
-          const today = new Date().toISOString().slice(0, 10);
-          checkInDate = today;
-          checkOutDate = today;
+          const today = new Date();
+          checkInDate = today.toISOString().split('T')[0];
+          // For one-day stay, checkout is the next day
+          const tomorrow = new Date(today);
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          checkOutDate = tomorrow.toISOString().split('T')[0];
           bookingType = 'Daily';
         } else if (durationType === 'oneMonth') {
           if (!bookingDates.checkInDate) {
-            const today = new Date().toISOString().slice(0, 10);
-            checkInDate = today;
+            const today = new Date();
+            checkInDate = today.toISOString().split('T')[0];
             const co = new Date(today);
             co.setDate(co.getDate() + 30);
-            checkOutDate = co.toISOString().slice(0, 10);
+            checkOutDate = co.toISOString().split('T')[0];
           }
           bookingType = 'Monthly';
         }
@@ -227,12 +230,18 @@ export default function PGDetails() {
         {/* Image Carousel */}
         {(images.length > 0 || pg.thumbnail) && (
           <div className="relative mb-6">
-            <img
-              src={images.length > 0 ? images[currentImageIndex % Math.max(1, images.length)] : pg.thumbnail}
-              alt={pg.name}
-              className="w-full h-80 object-cover rounded-lg"
-              onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80'; }}
-            />
+            {(() => {
+              const currentImg = images.length > 0 ? images[currentImageIndex % Math.max(1, images.length)] : pg.thumbnail;
+              const imageUrl = currentImg && currentImg.startsWith('http') ? currentImg : `http://localhost:5000${currentImg}`;
+              return (
+                <img
+                  src={imageUrl}
+                  alt={pg.name}
+                  className="w-full h-80 object-cover rounded-lg"
+                  onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80'; }}
+                />
+              );
+            })()}
 
             {/* Navigation Arrows */}
             {images.length > 1 && (

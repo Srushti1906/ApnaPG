@@ -6,7 +6,8 @@ const bookingSchema = new mongoose.Schema(
     bookingId: {
       type: String,
       unique: true,
-      required: true,
+      sparse: true,  // Allow null values when unique is set
+      default: null,
     },
 
     // User & Property References
@@ -160,6 +161,10 @@ const bookingSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Review',
     },
+
+    // Completion Details
+    completedAt: Date,
+    checkOutTime: Date,
 
     // Notes
     internalNotes: String,

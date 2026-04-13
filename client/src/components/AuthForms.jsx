@@ -81,6 +81,12 @@ export function LoginForm({ onSubmit }) {
           <button type="submit" className="btn-primary w-full">
             Login as {userRole}
           </button>
+
+          <div className="mt-3 text-center">
+            <a href="/forgot-password" className="text-sm text-blue-600 hover:text-blue-800 transition">
+              🔐 Forgot Password?
+            </a>
+          </div>
         </form>
 
         <p className="text-center mt-4 text-sm">

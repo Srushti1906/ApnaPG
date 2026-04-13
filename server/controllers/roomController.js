@@ -241,3 +241,106 @@ exports.updateAvailability = async (req, res) => {
     });
   }
 };
+
+// @route   POST /api/rooms/:id/upload-images
+// @desc    Upload images for a room (Owner only)
+// @access  Private
+exports.uploadRoomImages = async (req, res) => {
+  try {
+    const room = await Room.findById(req.params.id).populate('pg');
+
+    if (!room) {
+      return res.status(404).json({
+        success: false,
+        message: 'Room not found',
+      });
+    }
+
+    // Check authorization
+    if (room.pg.owner.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to upload images for this room',
+      });
+    }
+
+    // Check if files were uploaded
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No images provided',
+      });
+    }
+
+    // Generate image URLs
+    const imageUrls = req.files.map(file => `/uploads/${file.filename}`);
+
+    // Add new images to room
+    room.images = [...(room.images || []), ...imageUrls];
+    await room.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Images uploaded successfully',
+      images: imageUrls,
+      room,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error uploading images',
+      error: error.message,
+    });
+  }
+};
+
+// @route   DELETE /api/rooms/:id/images/:imagePath
+// @desc    Delete a specific image from room (Owner only)
+// @access  Private
+exports.deleteRoomImage = async (req, res) => {
+  try {
+    const room = await Room.findById(req.params.id).populate('pg');
+
+    if (!room) {
+      return res.status(404).json({
+        success: false,
+        message: 'Room not found',
+      });
+    }
+
+    // Check authorization
+    if (room.pg.owner.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to delete images from this room',
+      });
+    }
+
+    const { imagePath } = req.params;
+    const decodedPath = decodeURIComponent(imagePath);
+
+    // Remove image from array
+    room.images = room.images.filter(img => img !== decodedPath);
+    await room.save();
+
+    // Delete file from filesystem
+    const path = require('path');
+    const fs = require('fs');
+    const filePath = path.join(__dirname, '../', decodedPath);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Image deleted successfully',
+      room,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting image',
+      error: error.message,
+    });
+  }
+};

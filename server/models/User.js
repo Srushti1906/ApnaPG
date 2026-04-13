@@ -99,6 +99,18 @@ const userSchema = new mongoose.Schema(
         ref: 'Booking',
       },
     ],
+
+    // Password Reset
+    passwordResetCode: {
+      type: String,
+      select: false,
+      default: null,
+    },
+    passwordResetExpiry: {
+      type: Date,
+      select: false,
+      default: null,
+    },
   },
   {
     timestamps: true,

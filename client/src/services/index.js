@@ -7,6 +7,9 @@ export const authService = {
   getCurrentUser: () => apiClient.get('/auth/me'),
   updateProfile: (profileData) => apiClient.put('/auth/profile', profileData),
   logout: () => apiClient.post('/auth/logout'),
+  forgotPassword: (phone) => apiClient.post('/auth/forgot-password', { phone }),
+  resetPassword: (phone, resetCode, newPassword, confirmPassword) =>
+    apiClient.post('/auth/reset-password', { phone, resetCode, newPassword, confirmPassword }),
 };
 
 // PG Services
@@ -18,6 +21,10 @@ export const pgService = {
   updatePG: (id, pgData) => apiClient.put(`/pgs/${id}`, pgData),
   deletePG: (id) => apiClient.delete(`/pgs/${id}`),
   getPGRooms: (pgId) => apiClient.get(`/pgs/${pgId}/rooms`),
+  uploadImages: (id, formData) =>
+    apiClient.post(`/pgs/${id}/upload-images`, formData),
+  deleteImage: (id, imagePath) =>
+    apiClient.delete(`/pgs/${id}/images/${encodeURIComponent(imagePath)}`),
 };
 
 // Room Services
@@ -28,6 +35,12 @@ export const roomService = {
   deleteRoom: (id) => apiClient.delete(`/rooms/${id}`),
   updateAvailability: (id, availability) => 
     apiClient.put(`/rooms/${id}/availability`, availability),
+  uploadImages: (id, formData) => 
+    apiClient.post(`/rooms/${id}/upload-images`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    }),
+  deleteImage: (id, imagePath) => 
+    apiClient.delete(`/rooms/${id}/images/${encodeURIComponent(imagePath)}`),
 };
 
 // Booking Services
@@ -58,4 +71,5 @@ export const reviewService = {
 // Enquiry Service (for quick booking requests)
 export const enquiryService = {
   createEnquiry: (data) => apiClient.post('/enquiries', data),
+  getOwnerEnquiries: (params) => apiClient.get('/enquiries/owner/enquiries', { params }),
 };

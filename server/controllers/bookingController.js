@@ -137,10 +137,9 @@ exports.createBooking = async (req, res) => {
     room.recentBookings.push(booking._id);
     await room.save();
 
-    // Add to user's booking history
-    req.user.bookingHistory.push(booking._id);
+    // Add to user's booking history using $push operator
     await User.findByIdAndUpdate(req.user._id, {
-      bookingHistory: req.user.bookingHistory,
+      $push: { bookingHistory: booking._id },
     });
 
     res.status(201).json({
@@ -452,15 +451,20 @@ exports.getOwnerCustomers = async (req, res) => {
     const customerMap = new Map();
 
     allBookings.forEach(booking => {
+      // Skip if booking doesn't have required data
+      if (!booking.user || !booking.pg || !booking.room) {
+        return;
+      }
+
       const userId = booking.user._id.toString();
       
       if (!customerMap.has(userId)) {
         customerMap.set(userId, {
           _id: booking.user._id,
-          fullName: booking.user.fullName,
-          email: booking.user.email,
-          phone: booking.user.phone,
-          gender: booking.user.gender,
+          fullName: booking.user.fullName || 'Unknown',
+          email: booking.user.email || 'N/A',
+          phone: booking.user.phone || 'N/A',
+          gender: booking.user.gender || 'Not specified',
           memberSince: booking.user.createdAt,
           totalBookings: 0,
           totalAmount: 0,
@@ -472,7 +476,7 @@ exports.getOwnerCustomers = async (req, res) => {
 
       const customer = customerMap.get(userId);
       customer.totalBookings += 1;
-      customer.totalAmount += booking.finalPrice;
+      customer.totalAmount += booking.finalPrice || 0;
       
       // Track status count
       customer.bookingStatus[booking.status] = (customer.bookingStatus[booking.status] || 0) + 1;

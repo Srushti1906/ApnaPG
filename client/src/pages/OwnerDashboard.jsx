@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../context/AuthContext';
-import { pgService, bookingService } from '../services';
+import { pgService, bookingService, enquiryService } from '../services';
 import { LoadingSpinner, Alert } from '../components/Common';
 
 export default function OwnerDashboard() {
@@ -10,6 +10,7 @@ export default function OwnerDashboard() {
   const [pgs, setPGs] = useState([]);
   const [customers, setCustomers] = useState(null);
   const [bookingRequests, setBookingRequests] = useState([]);
+  const [enquiries, setEnquiries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [alert, setAlert] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
@@ -22,6 +23,7 @@ export default function OwnerDashboard() {
     }
     if (activeTab === 'requests') {
       fetchBookingRequests();
+      fetchEnquiries();
     }
   }, []);
 
@@ -31,6 +33,7 @@ export default function OwnerDashboard() {
     }
     if (activeTab === 'requests') {
       fetchBookingRequests();
+      fetchEnquiries();
     }
   }, [activeTab]);
 
@@ -73,11 +76,27 @@ export default function OwnerDashboard() {
     }
   };
 
+  const fetchEnquiries = async () => {
+    try {
+      const response = await enquiryService.getOwnerEnquiries();
+      setEnquiries(response.data.enquiries || []);
+    } catch (error) {
+      setAlert({
+        type: 'error',
+        message: error.response?.data?.message || 'Failed to load enquiries',
+      });
+    }
+  };
+
   const handleApproveBooking = async (bookingId) => {
     try {
       await bookingService.approveBooking(bookingId);
       setAlert({ type: 'success', message: 'Booking approved!' });
       fetchBookingRequests();
+      // Also refresh customers to show updated status
+      if (customers) {
+        fetchOwnerCustomers();
+      }
     } catch (error) {
       setAlert({ type: 'error', message: 'Failed to approve booking' });
     }
@@ -88,6 +107,10 @@ export default function OwnerDashboard() {
       await bookingService.rejectBooking(bookingId, { reason: 'Admin rejection' });
       setAlert({ type: 'success', message: 'Booking rejected!' });
       fetchBookingRequests();
+      // Also refresh customers to show updated status
+      if (customers) {
+        fetchOwnerCustomers();
+      }
     } catch (error) {
       setAlert({ type: 'error', message: 'Failed to reject booking' });
     }
@@ -370,15 +393,15 @@ export default function OwnerDashboard() {
                           <div className="flex items-center gap-3 mb-2">
                             <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                               <span className="font-bold text-blue-600">
-                                {(customer.customerName || 'C')[0].toUpperCase()}
+                                {(customer.fullName || 'C')[0].toUpperCase()}
                               </span>
                             </div>
                             <div>
-                              <h3 className="font-bold text-lg">{customer.customerName}</h3>
-                              <p className="text-sm text-gray-600">{customer.customerEmail}</p>
+                              <h3 className="font-bold text-lg">{customer.fullName}</h3>
+                              <p className="text-sm text-gray-600">{customer.email}</p>
                             </div>
                           </div>
-                          <p className="text-sm text-gray-600 mb-3">📞 {customer.customerPhone}</p>
+                          <p className="text-sm text-gray-600 mb-3">📞 {customer.phone}</p>
                           
                           <div className="grid grid-cols-5 gap-3 text-sm">
                             <div className="bg-blue-50 p-2 rounded">
@@ -472,66 +495,129 @@ export default function OwnerDashboard() {
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold">📬 Pending Booking Requests</h2>
             <button 
-              onClick={() => fetchBookingRequests()}
+              onClick={() => { fetchBookingRequests(); fetchEnquiries(); }}
               className="bg-gray-200 hover:bg-gray-300 px-3 py-2 rounded text-sm font-medium"
             >
               🔄 Refresh
             </button>
           </div>
 
-          {bookingRequests.length > 0 ? (
-            <div className="grid md:grid-cols-2 gap-6">
-              {bookingRequests.map(booking => (
-                <div key={booking._id} className="card border-2 border-yellow-300 bg-yellow-50">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h3 className="text-lg font-bold">{booking.pg?.name || 'PG'}</h3>
-                      <p className="text-sm text-gray-600">Room: {booking.room?.roomNumber || 'N/A'}</p>
+          {/* Pending Bookings Section */}
+          {bookingRequests.length > 0 && (
+            <div className="mb-8">
+              <h3 className="text-xl font-bold mb-4">📋 Confirmed Bookings (Pending Approval)</h3>
+              <div className="grid md:grid-cols-2 gap-6">
+                {bookingRequests.map(booking => (
+                  <div key={booking._id} className="card border-2 border-yellow-300 bg-yellow-50">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h3 className="text-lg font-bold">{booking.pg?.name || 'PG'}</h3>
+                        <p className="text-sm text-gray-600">Room: {booking.room?.roomNumber || 'N/A'}</p>
+                      </div>
+                      <span className="bg-yellow-300 text-yellow-900 px-3 py-1 rounded-full text-sm font-bold">⏳ Pending</span>
                     </div>
-                    <span className="bg-yellow-300 text-yellow-900 px-3 py-1 rounded-full text-sm font-bold">⏳ Pending</span>
-                  </div>
 
-                  <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
-                    <div className="bg-white p-2 rounded">
-                      <p className="text-gray-600 text-xs">Check-in</p>
-                      <p className="font-bold">{new Date(booking.checkInDate).toLocaleDateString()}</p>
+                    <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
+                      <div className="bg-white p-2 rounded">
+                        <p className="text-gray-600 text-xs">Check-in</p>
+                        <p className="font-bold">{new Date(booking.checkInDate).toLocaleDateString()}</p>
+                      </div>
+                      <div className="bg-white p-2 rounded">
+                        <p className="text-gray-600 text-xs">Check-out</p>
+                        <p className="font-bold">{new Date(booking.checkOutDate).toLocaleDateString()}</p>
+                      </div>
+                      <div className="bg-white p-2 rounded">
+                        <p className="text-gray-600 text-xs">Nights</p>
+                        <p className="font-bold">{booking.numberOfNights}</p>
+                      </div>
+                      <div className="bg-white p-2 rounded">
+                        <p className="text-gray-600 text-xs">Total Price</p>
+                        <p className="font-bold">₹{booking.finalPrice}</p>
+                      </div>
                     </div>
-                    <div className="bg-white p-2 rounded">
-                      <p className="text-gray-600 text-xs">Check-out</p>
-                      <p className="font-bold">{new Date(booking.checkOutDate).toLocaleDateString()}</p>
-                    </div>
-                    <div className="bg-white p-2 rounded">
-                      <p className="text-gray-600 text-xs">Nights</p>
-                      <p className="font-bold">{booking.numberOfNights}</p>
-                    </div>
-                    <div className="bg-white p-2 rounded">
-                      <p className="text-gray-600 text-xs">Total Price</p>
-                      <p className="font-bold">₹{booking.finalPrice}</p>
-                    </div>
-                  </div>
 
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleApproveBooking(booking._id)}
-                      className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-3 rounded text-sm"
-                    >
-                      ✅ Approve
-                    </button>
-                    <button
-                      onClick={() => handleRejectBooking(booking._id)}
-                      className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-3 rounded text-sm"
-                    >
-                      ❌ Reject
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleApproveBooking(booking._id)}
+                        className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-3 rounded text-sm"
+                      >
+                        ✅ Approve
+                      </button>
+                      <button
+                        onClick={() => handleRejectBooking(booking._id)}
+                        className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-3 rounded text-sm"
+                      >
+                        ❌ Reject
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          ) : (
+          )}
+
+          {/* Enquiries Section */}
+          {enquiries.length > 0 && (
+            <div className="mb-8">
+              <h3 className="text-xl font-bold mb-4">💬 Guest Enquiries (Quick Booking Requests)</h3>
+              <div className="grid md:grid-cols-2 gap-6">
+                {enquiries.map(enquiry => (
+                  <div key={enquiry._id} className="card border-2 border-blue-300 bg-blue-50">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h3 className="text-lg font-bold">{enquiry.pg?.name || enquiry.pgName || 'General Inquiry'}</h3>
+                        <p className="text-sm text-gray-600">Guest: {enquiry.name}</p>
+                      </div>
+                      <span className="bg-blue-300 text-blue-900 px-3 py-1 rounded-full text-sm font-bold">💬 Enquiry</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
+                      <div className="bg-white p-2 rounded">
+                        <p className="text-gray-600 text-xs">Phone</p>
+                        <p className="font-bold"><a href={`tel:${enquiry.phone}`} className="text-blue-600 hover:underline">{enquiry.phone}</a></p>
+                      </div>
+                      <div className="bg-white p-2 rounded">
+                        <p className="text-gray-600 text-xs">Duration</p>
+                        <p className="font-bold">{enquiry.days} day{enquiry.days > 1 ? 's' : ''}</p>
+                      </div>
+                      {enquiry.collegeName && (
+                        <div className="bg-white p-2 rounded col-span-2">
+                          <p className="text-gray-600 text-xs">College</p>
+                          <p className="font-bold">{enquiry.collegeName}</p>
+                        </div>
+                      )}
+                      <div className="bg-white p-2 rounded col-span-2">
+                        <p className="text-gray-600 text-xs">Received</p>
+                        <p className="font-bold">{new Date(enquiry.createdAt).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <a
+                        href={`tel:${enquiry.phone}`}
+                        className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-3 rounded text-sm text-center"
+                      >
+                        📞 Call
+                      </a>
+                      <button
+                        onClick={() => window.location.href = `mailto:${enquiry.phone}?subject=Re: Your enquiry for ${enquiry.pg?.name || enquiry.pgName}`}
+                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-3 rounded text-sm"
+                      >
+                        💬 Reply
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Empty State */}
+          {bookingRequests.length === 0 && enquiries.length === 0 && (
             <div className="card text-center py-12 bg-green-50 border-2 border-green-200">
               <p className="text-3xl mb-3">✅</p>
               <p className="text-lg font-bold text-green-800">No Pending Requests</p>
-              <p className="text-green-700 mt-2">All your booking requests have been processed</p>
+              <p className="text-green-700 mt-2">All your booking requests and enquiries have been processed</p>
             </div>
           )}
         </div>
