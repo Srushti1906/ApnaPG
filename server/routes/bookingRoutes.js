@@ -8,6 +8,7 @@ const {
   approveBooking,
   rejectBooking,
   cancelBooking,
+  updateCheckInOut,
 } = require('../controllers/bookingController');
 const { protect, authorize, checkGenderCompatibility } = require('../middleware/auth');
 const { validateBooking } = require('../middleware/validation');
@@ -49,5 +50,8 @@ router.put('/:id/reject', protect, authorize('Owner'), rejectBooking);
 
 // User cancellation
 router.put('/:id/cancel', protect, authorize('User'), cancelBooking);
+
+// Update check-in and check-out details
+router.patch('/:id/check-in-out', protect, authorize('Owner'), updateCheckInOut);
 
 module.exports = router;

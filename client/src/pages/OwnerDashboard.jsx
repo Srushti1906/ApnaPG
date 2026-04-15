@@ -11,10 +11,15 @@ export default function OwnerDashboard() {
   const [customers, setCustomers] = useState(null);
   const [bookingRequests, setBookingRequests] = useState([]);
   const [enquiries, setEnquiries] = useState([]);
+  const [activeBookings, setActiveBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [alert, setAlert] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [sortBy, setSortBy] = useState('lastBooking');
+  const [showCheckInOutModal, setShowCheckInOutModal] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState(null);
+  const [checkInOutForm, setCheckInOutForm] = useState({ actualCheckIn: '', actualCheckOut: '' });
+  const [expandedCustomerId, setExpandedCustomerId] = useState(null);
 
   useEffect(() => {
     fetchOwnerPGs();
@@ -34,6 +39,9 @@ export default function OwnerDashboard() {
     if (activeTab === 'requests') {
       fetchBookingRequests();
       fetchEnquiries();
+    }
+    if (activeTab === 'check-in-out') {
+      fetchActiveBookings();
     }
   }, [activeTab]);
 
@@ -114,6 +122,52 @@ export default function OwnerDashboard() {
     } catch (error) {
       setAlert({ type: 'error', message: 'Failed to reject booking' });
     }
+  };
+
+  const fetchActiveBookings = async () => {
+    try {
+      const response = await bookingService.getOwnerBookings({ status: 'Confirmed,CheckedIn' });
+      setActiveBookings(response.data.bookings || []);
+    } catch (error) {
+      setAlert({
+        type: 'error',
+        message: error.response?.data?.message || 'Failed to load active bookings',
+      });
+    }
+  };
+
+  const handleUpdateCheckInOut = async (e) => {
+    e.preventDefault();
+    if (!selectedBooking) return;
+    
+    try {
+      const updateData = {};
+      if (checkInOutForm.actualCheckIn) updateData.actualCheckIn = checkInOutForm.actualCheckIn;
+      if (checkInOutForm.actualCheckOut) updateData.actualCheckOut = checkInOutForm.actualCheckOut;
+      
+      if (Object.keys(updateData).length === 0) {
+        setAlert({ type: 'error', message: 'Please fill in at least one field' });
+        return;
+      }
+
+      await bookingService.updateCheckInOut(selectedBooking._id, updateData);
+      setAlert({ type: 'success', message: 'Check-in/Check-out details updated successfully!' });
+      setShowCheckInOutModal(false);
+      setSelectedBooking(null);
+      setCheckInOutForm({ actualCheckIn: '', actualCheckOut: '' });
+      fetchActiveBookings();
+    } catch (error) {
+      setAlert({ type: 'error', message: error.response?.data?.message || 'Failed to update check-in/check-out details' });
+    }
+  };
+
+  const openCheckInOutModal = (booking) => {
+    setSelectedBooking(booking);
+    setCheckInOutForm({
+      actualCheckIn: booking.actualCheckIn ? new Date(booking.actualCheckIn).toISOString().slice(0, 16) : '',
+      actualCheckOut: booking.actualCheckOut ? new Date(booking.actualCheckOut).toISOString().slice(0, 16) : '',
+    });
+    setShowCheckInOutModal(true);
   };
 
   if (loading) return <LoadingSpinner />;
@@ -212,6 +266,16 @@ export default function OwnerDashboard() {
           }`}
         >
           📅 Bookings
+        </button>
+        <button
+          onClick={() => { setActiveTab('check-in-out'); fetchActiveBookings(); }}
+          className={`px-4 py-2 font-medium ${
+            activeTab === 'check-in-out'
+              ? 'text-blue-600 border-b-2 border-blue-600'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          🔑 Check-in/Out
         </button>
         <button
           onClick={() => setActiveTab('requests')}
@@ -460,10 +524,80 @@ export default function OwnerDashboard() {
                             </div>
                           )}
                         </div>
-                        <button className="px-4 py-2 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 font-medium text-sm">
-                          📊 View Details
+                        <button 
+                          onClick={() => setExpandedCustomerId(expandedCustomerId === customer._id ? null : customer._id)}
+                          className="px-4 py-2 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 font-medium text-sm"
+                        >
+                          {expandedCustomerId === customer._id ? '▼ Hide Details' : '📊 View Details'}
                         </button>
                       </div>
+
+                      {/* Booking History - Expandable */}
+                      {expandedCustomerId === customer._id && customer.bookings && customer.bookings.length > 0 && (
+                        <div className="mt-4 pt-4 border-t border-gray-200">
+                          <h4 className="font-bold text-lg mb-3">📅 Booking History</h4>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="bg-gray-100">
+                                  <th className="px-3 py-2 text-left font-semibold">Booking ID</th>
+                                  <th className="px-3 py-2 text-left font-semibold">Property</th>
+                                  <th className="px-3 py-2 text-left font-semibold">Scheduled Check-in</th>
+                                  <th className="px-3 py-2 text-left font-semibold">Actual Check-in</th>
+                                  <th className="px-3 py-2 text-left font-semibold">Scheduled Check-out</th>
+                                  <th className="px-3 py-2 text-left font-semibold">Actual Check-out</th>
+                                  <th className="px-3 py-2 text-left font-semibold">Status</th>
+                                  <th className="px-3 py-2 text-left font-semibold">Amount</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {customer.bookings.map((booking, idx) => (
+                                  <tr key={booking._id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                    <td className="px-3 py-2 font-medium text-blue-600">{booking.bookingId}</td>
+                                    <td className="px-3 py-2">{booking.pg} (Room {booking.room})</td>
+                                    <td className="px-3 py-2 text-xs">
+                                      {new Date(booking.checkInDate).toLocaleDateString('en-IN')}
+                                    </td>
+                                    <td className="px-3 py-2 text-xs">
+                                      {booking.actualCheckIn ? (
+                                        <span className="bg-green-100 text-green-800 px-2 py-1 rounded">
+                                          ✓ {new Date(booking.actualCheckIn).toLocaleDateString('en-IN')}
+                                        </span>
+                                      ) : (
+                                        <span className="text-gray-500">-</span>
+                                      )}
+                                    </td>
+                                    <td className="px-3 py-2 text-xs">
+                                      {new Date(booking.checkOutDate).toLocaleDateString('en-IN')}
+                                    </td>
+                                    <td className="px-3 py-2 text-xs">
+                                      {booking.actualCheckOut ? (
+                                        <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                                          ✓ {new Date(booking.actualCheckOut).toLocaleDateString('en-IN')}
+                                        </span>
+                                      ) : (
+                                        <span className="text-gray-500">-</span>
+                                      )}
+                                    </td>
+                                    <td className="px-3 py-2">
+                                      <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                                        booking.status === 'Completed' ? 'bg-green-100 text-green-800' :
+                                        booking.status === 'CheckedIn' ? 'bg-blue-100 text-blue-800' :
+                                        booking.status === 'Confirmed' ? 'bg-yellow-100 text-yellow-800' :
+                                        booking.status === 'Cancelled' ? 'bg-red-100 text-red-800' :
+                                        'bg-gray-100 text-gray-800'
+                                      }`}>
+                                        {booking.status}
+                                      </span>
+                                    </td>
+                                    <td className="px-3 py-2 font-medium">₹{booking.finalPrice?.toLocaleString()}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -620,6 +754,148 @@ export default function OwnerDashboard() {
               <p className="text-green-700 mt-2">All your booking requests and enquiries have been processed</p>
             </div>
           )}
+        </div>
+      )}
+
+      {activeTab === 'check-in-out' && (
+        <div>
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold">🔑 Check-in / Check-out Management</h2>
+            <button 
+              onClick={fetchActiveBookings}
+              className="bg-gray-200 hover:bg-gray-300 px-3 py-2 rounded text-sm font-medium"
+            >
+              🔄 Refresh
+            </button>
+          </div>
+
+          {activeBookings.length > 0 ? (
+            <div className="grid gap-4">
+              <div className="card">
+                <h3 className="text-lg font-bold mb-4">📊 Active Bookings</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-200 bg-gray-50">
+                        <th className="px-4 py-2 text-left font-semibold">Customer</th>
+                        <th className="px-4 py-2 text-left font-semibold">Property / Room</th>
+                        <th className="px-4 py-2 text-left font-semibold">Scheduled Check-in</th>
+                        <th className="px-4 py-2 text-left font-semibold">Actual Check-in</th>
+                        <th className="px-4 py-2 text-left font-semibold">Status</th>
+                        <th className="px-4 py-2 text-left font-semibold">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {activeBookings.map((booking, index) => (
+                        <tr key={booking._id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                          <td className="px-4 py-3 font-medium">{booking.user?.fullName || 'N/A'}</td>
+                          <td className="px-4 py-3">
+                            <div className="text-sm">
+                              <p className="font-medium">{booking.pg?.name}</p>
+                              <p className="text-gray-600">Room {booking.room?.roomNumber}</p>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-sm">
+                            {new Date(booking.checkInDate).toLocaleDateString('en-IN')}
+                          </td>
+                          <td className="px-4 py-3 text-sm">
+                            {booking.actualCheckIn ? (
+                              <span className="bg-green-100 text-green-800 px-2 py-1 rounded">
+                                ✓ {new Date(booking.actualCheckIn).toLocaleDateString('en-IN')}
+                              </span>
+                            ) : (
+                              <span className="text-gray-500">Pending</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-sm">
+                            <span className={`px-3 py-1 rounded text-white font-semibold ${
+                              booking.status === 'CheckedIn' ? 'bg-green-600' : 'bg-yellow-600'
+                            }`}>
+                              {booking.status === 'CheckedIn' ? '✓ Checked In' : '⏳ Confirmed'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <button
+                              onClick={() => openCheckInOutModal(booking)}
+                              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm font-medium"
+                            >
+                              ✏️ Update
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="card text-center py-12 bg-blue-50 border-2 border-blue-200">
+              <p className="text-3xl mb-3">📭</p>
+              <p className="text-lg font-bold text-gray-800">No Active Bookings</p>
+              <p className="text-gray-600 mt-2">No confirmed or checked-in bookings at the moment</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Check-in/Check-out Modal */}
+      {showCheckInOutModal && selectedBooking && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <h3 className="text-2xl font-bold mb-4">Update Check-in/Check-out</h3>
+            <p className="text-gray-600 mb-4 text-sm">
+              <strong>{selectedBooking.user?.fullName}</strong> - {selectedBooking.pg?.name} (Room {selectedBooking.room?.roomNumber})
+            </p>
+
+            <form onSubmit={handleUpdateCheckInOut} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Actual Check-in Date & Time</label>
+                <input
+                  type="datetime-local"
+                  value={checkInOutForm.actualCheckIn}
+                  onChange={(e) => setCheckInOutForm({ 
+                    ...checkInOutForm, 
+                    actualCheckIn: e.target.value 
+                  })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Actual Check-out Date & Time</label>
+                <input
+                  type="datetime-local"
+                  value={checkInOutForm.actualCheckOut}
+                  onChange={(e) => setCheckInOutForm({ 
+                    ...checkInOutForm, 
+                    actualCheckOut: e.target.value 
+                  })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
+                >
+                  ✅ Save
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCheckInOutModal(false);
+                    setSelectedBooking(null);
+                    setCheckInOutForm({ actualCheckIn: '', actualCheckOut: '' });
+                  }}
+                  className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded"
+                >
+                  ❌ Cancel
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 

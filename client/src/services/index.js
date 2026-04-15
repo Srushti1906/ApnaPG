@@ -53,6 +53,7 @@ export const bookingService = {
   approveBooking: (id) => apiClient.put(`/bookings/${id}/approve`),
   rejectBooking: (id, data) => apiClient.put(`/bookings/${id}/reject`, data),
   cancelBooking: (id, data) => apiClient.put(`/bookings/${id}/cancel`, data),
+  updateCheckInOut: (id, data) => apiClient.patch(`/bookings/${id}/check-in-out`, data),
 };
 
 // Review Services

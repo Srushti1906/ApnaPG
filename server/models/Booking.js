@@ -168,6 +168,30 @@ const bookingSchema = new mongoose.Schema(
 
     // Notes
     internalNotes: String,
+
+    // Check-in and Check-out Updates
+    actualCheckIn: {
+      type: Date,
+      default: null,
+    },
+    actualCheckOut: {
+      type: Date,
+      default: null,
+    },
+
+    // Record of Customers Who Stayed
+    stayedCustomers: [
+      {
+        customerId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'User',
+        },
+        stayedAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
   },
   {
     timestamps: true,

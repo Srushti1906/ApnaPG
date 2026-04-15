@@ -55,6 +55,18 @@ export default function PGDetails() {
     };
 
     fetchData();
+
+    // Auto-refresh room availability every 30 seconds to show real-time updates
+    const interval = setInterval(async () => {
+      try {
+        const roomsRes = await pgService.getPGRooms(id);
+        setRooms(roomsRes.data.rooms || []);
+      } catch (error) {
+        console.error('Error refreshing room availability:', error);
+      }
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
   }, [id]);
 
   const handleBooking = async () => {
@@ -510,7 +522,23 @@ export default function PGDetails() {
 
       {/* Rooms */}
       <div className="card mb-8">
-        <h2 className="text-2xl font-bold mb-6">Available Rooms</h2>
+        <h2 className="text-2xl font-bold mb-6 flex justify-between items-center">
+          Available Rooms
+          <button
+            onClick={async () => {
+              try {
+                const roomsRes = await pgService.getPGRooms(id);
+                setRooms(roomsRes.data.rooms || []);
+                setAlert({ type: 'success', message: 'Room availability updated!' });
+              } catch (error) {
+                setAlert({ type: 'error', message: 'Failed to refresh availability' });
+              }
+            }}
+            className="text-sm px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded font-medium"
+          >
+            🔄 Refresh
+          </button>
+        </h2>
         {rooms.length > 0 ? (
           <div className="grid md:grid-cols-3 gap-6">
             {rooms.map((room) => (
@@ -540,7 +568,7 @@ export default function PGDetails() {
                   </div>
                   <div className="flex items-center gap-2 text-gray-700">
                     <span className="text-lg">👥</span>
-                    <span>{room.availability?.vacantBeds || 0} vacant bed{(room.availability?.vacantBeds || 0) > 1 ? 's' : ''}</span>
+                    <span>{room.availableBeds || 0} vacant bed{(room.availableBeds || 0) > 1 ? 's' : ''}</span>
                   </div>
                 </div>
 

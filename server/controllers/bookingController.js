@@ -2,6 +2,7 @@ const Booking = require('../models/Booking');
 const Room = require('../models/Room');
 const PG = require('../models/PG');
 const User = require('../models/User');
+const { updateRoomAvailability } = require('../services/roomAvailabilityService');
 
 // @route   POST /api/bookings
 // @desc    Create a new booking (with gender validation)
@@ -248,7 +249,14 @@ exports.getOwnerBookings = async (req, res) => {
     const { status, page = 1, limit = 10 } = req.query;
 
     let filter = { owner: req.user._id };
-    if (status) filter.status = status;
+    if (status) {
+      // Handle multiple statuses separated by comma
+      if (status.includes(',')) {
+        filter.status = { $in: status.split(',').map(s => s.trim()) };
+      } else {
+        filter.status = status;
+      }
+    }
 
     const skip = (page - 1) * limit;
 
@@ -497,6 +505,8 @@ exports.getOwnerCustomers = async (req, res) => {
         room: booking.room.roomNumber,
         checkInDate: booking.checkInDate,
         checkOutDate: booking.checkOutDate,
+        actualCheckIn: booking.actualCheckIn,
+        actualCheckOut: booking.actualCheckOut,
         status: booking.status,
         bookingType: booking.bookingType,
         finalPrice: booking.finalPrice,
@@ -547,6 +557,59 @@ exports.getOwnerCustomers = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching customers',
+      error: error.message,
+    });
+  }
+};
+
+// @route   PATCH /api/bookings/:id/check-in-out
+// @desc    Update check-in and check-out details
+// @access  Private (Owner only)
+exports.updateCheckInOut = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { actualCheckIn, actualCheckOut, stayedCustomers } = req.body;
+
+    // Find booking
+    const booking = await Booking.findById(id);
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: 'Booking not found',
+      });
+    }
+
+    // Authorization check
+    if (booking.owner.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to update this booking',
+      });
+    }
+
+    // Update check-in and check-out details
+    if (actualCheckIn) booking.actualCheckIn = new Date(actualCheckIn);
+    if (actualCheckOut) booking.actualCheckOut = new Date(actualCheckOut);
+
+    // Update stayed customers
+    if (stayedCustomers && Array.isArray(stayedCustomers)) {
+      booking.stayedCustomers.push(...stayedCustomers);
+    }
+
+    await booking.save();
+
+    // Update room availability after check-in/check-out update
+    await updateRoomAvailability(booking.room);
+
+    res.status(200).json({
+      success: true,
+      message: 'Check-in and check-out details updated successfully',
+      booking,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error updating check-in and check-out details',
       error: error.message,
     });
   }

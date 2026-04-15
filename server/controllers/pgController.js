@@ -2,6 +2,7 @@ const PG = require('../models/PG');
 const Room = require('../models/Room');
 const Booking = require('../models/Booking');
 const User = require('../models/User');
+const { calculateActualAvailableBeds } = require('../services/roomAvailabilityService');
 
 // @route   POST /api/pgs
 // @desc    Create a new PG (Owner only)
@@ -148,9 +149,28 @@ exports.getPGs = async (req, res) => {
     };
 
     for (const pg of pgs) {
-      const rooms = await Room.find({ pg: pg._id }).select('dailyPrice monthlyPrice');
+      const rooms = await Room.find({ pg: pg._id }).select('dailyPrice monthlyPrice bedCount availableBeds');
       const pgObj = pg.toObject();
+      
       if (rooms && rooms.length > 0) {
+        // Calculate real-time availability for each room
+        let totalBeds = 0;
+        let availableBeds = 0;
+
+        for (const room of rooms) {
+          totalBeds += room.bedCount || 0;
+          try {
+            const availability = await calculateActualAvailableBeds(room._id);
+            availableBeds += availability.availableBeds;
+          } catch (error) {
+            console.error(`Error calculating availability for room ${room._id}:`, error);
+            availableBeds += room.availableBeds || 0;
+          }
+        }
+
+        pgObj.totalBeds = totalBeds;
+        pgObj.availableBeds = availableBeds;
+
         const dailyPrices = rooms.map((r) => r.dailyPrice || (r.monthlyPrice ? Math.round(r.monthlyPrice / 30) : 0)).filter(Boolean);
         if (dailyPrices.length) {
           let minDaily = Math.min(...dailyPrices);
@@ -207,11 +227,28 @@ exports.getPGById = async (req, res) => {
       });
     }
 
+    // Calculate real-time availability for each room
+    const roomsWithAvailability = await Promise.all(
+      rooms.map(async (room) => {
+        const roomObj = room.toObject();
+        try {
+          const availability = await calculateActualAvailableBeds(room._id);
+          roomObj.availableBeds = availability.availableBeds;
+          roomObj.occupiedBeds = availability.occupiedBeds;
+        } catch (error) {
+          console.error(`Error calculating availability for room ${room._id}:`, error);
+          // Fall back to stored value
+          roomObj.availableBeds = room.availableBeds;
+        }
+        return roomObj;
+      })
+    );
+
     // compute min/max from fetched rooms
-    if (rooms && rooms.length > 0) {
-      const dailyPrices = rooms.map((r) => r.dailyPrice || (r.monthlyPrice ? Math.round(r.monthlyPrice / 30) : 0)).filter(Boolean);
+    if (roomsWithAvailability && roomsWithAvailability.length > 0) {
+      const dailyPrices = roomsWithAvailability.map((r) => r.dailyPrice || (r.monthlyPrice ? Math.round(r.monthlyPrice / 30) : 0)).filter(Boolean);
       pg = pg.toObject();
-      pg.rooms = rooms;
+      pg.rooms = roomsWithAvailability;
       if (dailyPrices.length) {
         let minDaily = Math.min(...dailyPrices);
         let maxDaily = Math.max(...dailyPrices);
@@ -398,9 +435,25 @@ exports.getPGRooms = async (req, res) => {
   try {
     const rooms = await Room.find({ pg: req.params.id }).sort({ roomNumber: 1 });
 
+    // Calculate real-time availability for each room
+    const roomsWithAvailability = await Promise.all(
+      rooms.map(async (room) => {
+        const roomObj = room.toObject();
+        try {
+          const availability = await calculateActualAvailableBeds(room._id);
+          roomObj.availableBeds = availability.availableBeds;
+          roomObj.occupiedBeds = availability.occupiedBeds;
+        } catch (error) {
+          console.error(`Error calculating availability for room ${room._id}:`, error);
+          roomObj.availableBeds = room.availableBeds;
+        }
+        return roomObj;
+      })
+    );
+
     res.status(200).json({
       success: true,
-      rooms,
+      rooms: roomsWithAvailability,
     });
   } catch (error) {
     res.status(500).json({
