@@ -40,6 +40,7 @@ app.use('/api/bookings', require('./routes/bookingRoutes'));
 app.use('/api/reviews', require('./routes/reviewRoutes'));
 // Admin routes removed
 app.use('/api/enquiries', require('./routes/enquiryRoutes'));
+app.use('/api/chatbot', require('./routes/chatbotRoutes.js'));
 
 // Initialize automated booking completion task
 // Runs every hour to check and complete bookings whose checkout date has passed
